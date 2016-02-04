@@ -4,6 +4,7 @@ import java.util.regex.*;
 import java.net.*;
 import javax.swing.*;
 import javax.swing.border.Border;
+import com.github.dariakuzina.serverpart.ServerMessage;
 import java.awt.*;
 import java.awt.event.*;
 /**Client part for chat. The idea and part of the code is taken from "Head First Java" by Kathy Sierra, Bert Bates */
@@ -11,19 +12,16 @@ public class SimpleChatClient {
 
 	JTextArea incoming;
 	JTextField outgoing;
-	BufferedReader reader;
-	PrintWriter writer;
+	InputStream iStream;
+	OutputStream oStream;
+	ObjectInputStream reader;
+	ObjectOutputStream writer;
 	Socket mySocket;
 	JFrame myFrame;
 	Thread readerThread;
 	JButton connectButton, disconnectButton,sendButton;
-	String serverIP;
+	String serverIP,nickname;
 	int portNumber;
-	/*public static void main(String[] args) {
-		SimpleChatClient client=new SimpleChatClient();
-		client.go();
-
-	}*/
 	/**Builds GUI when client starts*/
 	public void go(){		
 		
@@ -73,10 +71,11 @@ public class SimpleChatClient {
 	private boolean setUpNetworking(String ip,int port) {
 		
 			try{
-				mySocket=new Socket(ip, port);
-				InputStreamReader streamReader=new InputStreamReader(mySocket.getInputStream());
-				reader=new BufferedReader(streamReader);
-				writer=new PrintWriter(mySocket.getOutputStream());
+				mySocket=new Socket(ip, port);	
+				iStream=mySocket.getInputStream();
+				oStream=mySocket.getOutputStream();
+				writer=new ObjectOutputStream(oStream);
+				reader=new ObjectInputStream(iStream);				
 				incoming.append("Connection established"+'\n');	
 				return true;
 			}catch(Exception ex){				
@@ -126,13 +125,24 @@ public class SimpleChatClient {
 		@Override
 		public void actionPerformed(ActionEvent e){
 			try{
-				writer.println(outgoing.getText());
-				writer.flush();
+				ClientMessage message=new ClientMessage(ClientMessage.TEXTMESSAGE, outgoing.getText());
+				writer.writeObject(message);
 			}catch(Exception ex){
-				ex.printStackTrace();
+				JOptionPane.showMessageDialog(myFrame, "Connection was corrupted");
 			}
 			outgoing.setText("");
 			outgoing.requestFocus();
+		}
+	}
+	/**Gets user's input and sends login query to server*/
+	public void logIn(){
+		String name;
+		if((name=JOptionPane.showInputDialog(myFrame, "Choose your nickname"))!=null){
+			try{
+				writer.writeObject(new ClientMessage(ClientMessage.LOGIN, name));
+			}catch(Exception ex){
+				JOptionPane.showMessageDialog(myFrame, "Connection was corrupted");
+			}
 		}
 	}
 	/**Change state of connectButton, disconnectButton, sendButton to opposite */
@@ -144,7 +154,7 @@ public class SimpleChatClient {
 	/**Listener for connectButton.*/
 	class ConnectButtonListener implements ActionListener{
 		
-		/**Asks for connection data. Tries to set connection with server till success or user's cancellation*/
+		/**Asks for connection data. Tries to set connection with server till success or user's cancellation. Logs in client*/
 		@Override
 		public void actionPerformed(ActionEvent ev){
 			int answer;
@@ -157,8 +167,8 @@ public class SimpleChatClient {
 					answer=JOptionPane.showOptionDialog(myFrame, message, header, JOptionPane.YES_NO_OPTION, JOptionPane.PLAIN_MESSAGE, null,options, null);
 				else {
 					readerThread=new Thread(new IncomingReader());
-					readerThread.start();					
-					changeButtonsState();
+					readerThread.start();
+					logIn();
 					break;
 				}
 			} while (answer==JOptionPane.YES_OPTION);								
@@ -166,26 +176,48 @@ public class SimpleChatClient {
 	}
 	/**Listener for disconnectButton*/
 	class DisconnectButtonListener implements ActionListener{
-		/**Closes client socket*/
+		/**Sends LOGOUT message to server*/
 		@Override
 		public void actionPerformed(ActionEvent e){
 			try{
-					mySocket.close();
-			}catch (Exception ex){
-				ex.printStackTrace();
+					ClientMessage message=new ClientMessage(ClientMessage.LOGOUT, "");
+					writer.writeObject(message);
+				}catch (Exception ex){
+					JOptionPane.showMessageDialog(myFrame, "Connection was corrupted");
 			}
 		}
 	}
 	/**Describes thread for reading messages from server*/
 	class IncomingReader implements Runnable{
 		
-		/**Reads messages from server while connection is set and socket is open*/
+		/**Reads messages from server till LOGOUT message*/
 		@Override
 		public void run(){
-			String message=null;
+			
 			try{
-				while((message=reader.readLine())!=null){
-					incoming.append(message+'\n');
+				Object message;
+				while(true)	
+				{	
+					message=(Object)reader.readObject();
+					if(message instanceof ClientMessage){
+						incoming.append(((ClientMessage) message).getTextMessage()+'\n');
+					}
+					else if((message instanceof ServerMessage)&&((ServerMessage)message).getType()==ServerMessage.LOGIN_ACCEPT){
+						nickname=((ServerMessage)message).getTextMessage();
+						incoming.append("Welcome "+nickname+"!\n");
+						changeButtonsState();
+					}
+					else if ((message instanceof ServerMessage)&&((ServerMessage)message).getType()==ServerMessage.LOGIN_DECLINE){
+						JOptionPane.showMessageDialog(myFrame, "Nickname "+((ServerMessage)message).getTextMessage()+" is already used. Please, choose another nickname");
+						logIn();
+					}
+					else if((message instanceof ServerMessage)&&((ServerMessage)message).getType()==ServerMessage.LOGOUT){
+						break;
+					}
+					else if(message instanceof ServerMessage){
+						incoming.append("Server message:"+((ServerMessage) message).getTextMessage()+'\n');
+					}	
+					
 				}
 				JOptionPane.showMessageDialog(myFrame, "You have been disconnected from the server");
 			}catch (Exception ex){
@@ -194,7 +226,6 @@ public class SimpleChatClient {
 			finally{
 				try{
 				incoming.append("Connection was disabled\n");
-				if(!mySocket.isClosed())
 				mySocket.close();
 				changeButtonsState();
 				}catch (Exception ex){

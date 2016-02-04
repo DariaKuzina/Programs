@@ -15,7 +15,6 @@ public class Starter {
 		else if(answer==JOptionPane.NO_OPTION) {
 			new SimpleChatServer().go();
 		}
-		
 	}
 
 }
