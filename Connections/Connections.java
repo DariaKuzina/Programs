@@ -28,6 +28,7 @@ public class Connections {
 	int lineThickness=3;
 	int borderSize=15;
 	int scale=50;
+	/**Builds frame with menu bar and "about" message*/
 	public void buildGUI(){
 		mainFrame=new JFrame("Connections");
 		mainFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -47,6 +48,8 @@ public class Connections {
 		mainFrame.setSize(500, 500);
 		mainFrame.setVisible(true);
 	}
+	/**Adds draw panel on frame
+	 * @param N Number of vertexes (recommended)*/
 	public void addDrawPanel(int N){
 		background.removeAll();			
 		background.setBorder(new EmptyBorder(borderSize, borderSize, borderSize, borderSize));
@@ -59,6 +62,7 @@ public class Connections {
 		mainFrame.getContentPane().add(background,BorderLayout.CENTER);	
 		mainFrame.setVisible(true);
 	}
+	/**Listener for "File"->"Open" menu item*/
 	class FileOpenListener implements ActionListener{
 
 		@Override
@@ -74,6 +78,8 @@ public class Connections {
 		}
 		
 	}
+	/**Reads information from file, proceeds it and draws connections
+	 * @param fileIn Input file*/
 	void start(File fileIn){
 		try {
 			Scanner scanner=new Scanner(fileIn);
@@ -81,11 +87,14 @@ public class Connections {
 			int poz=(int)Math.sqrt(N);
 			WeightedQuickUnion myWQU=new WeightedQuickUnion(N);
 			addDrawPanel(N);
+			int p,q,pRoot,qRoot;
 			while(scanner.hasNextInt()){
-				int p=scanner.nextInt();
-				int q=scanner.nextInt();
-				if(myWQU.connected(p, q))continue;
-				myWQU.union(p, q);
+				p=scanner.nextInt();
+				q=scanner.nextInt();
+				qRoot=myWQU.find(q);
+				pRoot=myWQU.find(p);
+				if(pRoot==qRoot)continue;
+				myWQU.union(p, q,pRoot,qRoot);
 				drawPane.addLine((p%poz)*scale,(p/poz)*scale, (q%poz)*scale,(q/poz)*scale,p,q);
 			}
 			scanner.close();

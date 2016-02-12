@@ -30,7 +30,7 @@ public class WeightedQuickUnion {
 		return find(p)==find(q);
 	}
 	/**Searches for root of p*/
-	private int find(int p){
+	public int find(int p){
 		while (p!=id[p])p=id[p];
 		return p;
 	}
@@ -41,24 +41,33 @@ public class WeightedQuickUnion {
 	public void union(int p,int q){
 		int i=find(p);
 		int j=find(q);
-		if(i==j)return;
-		if(sz[i]<sz[j]){id[i]=j;sz[j]+=sz[i];}
-		else{id[j]=i;sz[i]+=sz[j];}
+		union(p, q,i,j);
+	}
+	/**If p and q are in the same component (have the same root) does nothing
+	 * Otherwise chooses from two roots the one with the least component's size and merges two components to component with this root 
+	 * @param p First vertex
+	 * @param q Second vertex
+	 * @param pRoot First vertexe's root
+	 * @param qRoot Second vertexes's root*/
+	public void union(int p,int q,int pRoot, int qRoot){
+		if(pRoot==qRoot)return;
+		if(sz[pRoot]<sz[qRoot]){id[pRoot]=qRoot;sz[qRoot]+=sz[pRoot];}
+		else{id[qRoot]=pRoot;sz[pRoot]+=sz[qRoot];}
 		count--;
 	}
 	/*
 	public static void main(String[] args) {
 		try {
-			Scanner in=new Scanner(new File("C:\\Users\\User\\Desktop\\tinyUF.txt"));
+			Scanner in=new Scanner(new File("C:\\Users\\User\\Desktop\\example.txt"));
 			int n=in.nextInt();
 			WeightedQuickUnion myWQU=new WeightedQuickUnion(n);
-			int p,q;
+			int p,q,pRoot,qRoot;
 			while (in.hasNext()) {
 				p=in.nextInt();
 				q=in.nextInt();
-				if(myWQU.connected(p, q))continue;
-				myWQU.union(p, q);
-				System.out.println(p+" "+q);
+				pRoot=myWQU.find(p);
+				qRoot=myWQU.find(q);
+				myWQU.union(p, q,pRoot,qRoot);
 			}
 			System.out.println(myWQU.getCount()+" components");
 			in.close();
